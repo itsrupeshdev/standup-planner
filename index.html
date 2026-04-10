@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Daily Standup Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#111;--ink2:#555;--ink3:#999;
+  --surface:#fff;--surface2:#f7f6f3;--surface3:#efede8;
+  --border:#e5e2db;--border2:#ccc;
+  --green:#2d7a4f;--green-bg:#eaf4ee;
+  --blue:#1a5fa8;--blue-bg:#e8f0fa;
+  --amber:#8a5a00;--amber-bg:#fdf3dc;
+  --red:#a02020;--red-bg:#fdeaea;
+  --purple:#4a3aaa;--purple-bg:#eeecfb;
+  --r:10px;--rsm:6px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--ink);min-height:100vh}
+
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2.5rem 2rem;width:100%;max-width:420px;text-align:center}
+.login-card h1{font-size:20px;font-weight:600;margin-bottom:6px;letter-spacing:-.3px}
+.login-card p{font-size:13px;color:var(--ink3);margin-bottom:2rem}
+.dev-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.25rem}
+.dev-pick{padding:12px 10px;border:1px solid var(--border);border-radius:var(--r);cursor:pointer;background:var(--surface2);transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:6px}
+.dev-pick:hover{border-color:var(--border2);background:var(--surface)}
+.dev-pick.selected{border-color:var(--ink);background:var(--ink);color:#fff}
+.dev-pick .av{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;font-family:'DM Mono',monospace}
+.dev-pick .dname{font-size:13px;font-weight:500}
+.dev-pick.selected .av{background:rgba(255,255,255,.15)!important;color:#fff!important}
+.divider{display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;color:var(--ink3);font-size:12px}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.lead-btn{width:100%;padding:10px;border:1px dashed var(--border2);border-radius:var(--r);background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink2);cursor:pointer;transition:all .15s}
+.lead-btn:hover{background:var(--surface3)}
+.btn-enter{width:100%;margin-top:1.25rem;padding:11px;background:var(--ink);color:#fff;border:none;border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:opacity .15s}
+.btn-enter:hover{opacity:.85}
+.btn-enter:disabled{opacity:.35;cursor:default}
+
+#app{display:none;min-height:100vh;flex-direction:column}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;gap:12px;height:52px;position:sticky;top:0;z-index:10}
+.topbar-title{font-size:15px;font-weight:600;flex:1;letter-spacing:-.2px}
+.topbar-date{font-size:12px;color:var(--ink3);font-family:'DM Mono',monospace}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background .3s}
+.sync-dot.ok{background:var(--green)}
+.sync-dot.err{background:var(--red)}
+.sync-dot.loading{background:var(--amber);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sync-lbl{font-size:11px;color:var(--ink3)}
+.user-pill{display:flex;align-items:center;gap:7px;padding:5px 10px;border:1px solid var(--border);border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;background:var(--surface2)}
+.user-pill:hover{background:var(--surface3)}
+.av-sm{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;font-family:'DM Mono',monospace}
+
+.tab-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex}
+.tb{padding:12px 16px;border:none;background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tb.on{color:var(--ink);border-bottom-color:var(--ink)}
+.tb:hover:not(.on){color:var(--ink2)}
+
+.content{flex:1;padding:1.5rem;max-width:860px;margin:0 auto;width:100%}
+.section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--ink3);margin-bottom:12px}
+.view{display:none}.view.on{display:block}
+
+.add-bar{display:flex;gap:8px;margin-bottom:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;align-items:center;flex-wrap:wrap}
+.add-bar input{flex:1;min-width:150px;border:none;font-size:14px;font-family:'DM Sans',sans-serif;background:transparent;color:var(--ink);outline:none}
+.add-bar input::placeholder{color:var(--ink3)}
+.add-bar select{border:1px solid var(--border);border-radius:var(--rsm);padding:5px 10px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--ink);cursor:pointer;outline:none}
+.btn-add{background:var(--ink);color:#fff;border:none;border-radius:var(--rsm);padding:6px 14px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;white-space:nowrap}
+.btn-add:hover{opacity:.8}
+
+.dev-section{margin-bottom:1.5rem}
+.dev-hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;font-family:'DM Mono',monospace}
+.dev-name-lbl{font-size:14px;font-weight:600}
+.dev-meta{font-size:12px;color:var(--ink3);margin-left:auto;font-family:'DM Mono',monospace}
+.prog-bar-wrap{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:4px}
+.prog-bar-fill{height:100%;border-radius:2px;background:var(--green);transition:width .4s}
+
+.task-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;gap:12px;align-items:flex-start;transition:border-color .15s}
+.task-card:hover{border-color:var(--border2)}
+.task-card.done-card{opacity:.55}
+.task-left{flex:1;min-width:0}
+.task-title{font-size:13px;font-weight:500;word-break:break-word;line-height:1.45}
+.task-mod{font-size:11px;color:var(--ink3);font-family:'DM Mono',monospace;margin-top:2px}
+.task-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.tag{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap}
+.t-high{background:#fdeaea;color:#a02020}
+.t-medium{background:#fdf3dc;color:#8a5a00}
+.t-low{background:#eaf4ee;color:#2d7a4f}
+.t-eod{background:#e8f0fa;color:#1a5fa8}
+.t-tbd{background:var(--surface3);color:var(--ink2)}
+.t-other{background:var(--purple-bg);color:var(--purple)}
+.t-done{background:var(--green-bg);color:var(--green)}
+.t-prog{background:var(--blue-bg);color:var(--blue)}
+.t-block{background:var(--red-bg);color:var(--red)}
+.remove-btn{width:24px;height:24px;border:none;background:transparent;color:var(--ink3);cursor:pointer;font-size:18px;line-height:1;border-radius:4px;flex-shrink:0;transition:color .1s;display:flex;align-items:center;justify-content:center}
+.remove-btn:hover{color:var(--ink);background:var(--surface2)}
+
+.prog-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.prog-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.prog-title{font-size:13px;font-weight:500;flex:1;min-width:140px;line-height:1.4}
+.prog-sub{font-size:11px;color:var(--ink3);font-family:'DM Mono',monospace;margin-top:2px}
+.status-row{display:flex;gap:4px;flex-wrap:wrap}
+.sp{font-size:11px;padding:4px 10px;border-radius:20px;cursor:pointer;border:1.5px solid transparent;font-family:'DM Sans',sans-serif;font-weight:500;transition:all .1s}
+.prog-comment{width:100%;border:1px solid var(--border);border-radius:var(--rsm);padding:8px 10px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--ink);resize:none;height:52px;outline:none;transition:border-color .15s;margin-top:2px}
+.prog-comment:focus{border-color:var(--border2)}
+
+.stats-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:1.5rem}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.stat-n{font-size:24px;font-weight:600;letter-spacing:-.5px;font-family:'DM Mono',monospace}
+.stat-l{font-size:11px;color:var(--ink3);margin-top:3px;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+
+.report-dev{margin-bottom:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.report-dev-hdr{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.report-task{display:flex;align-items:flex-start;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border)}
+.report-task:last-child{border-bottom:none}
+.report-task-info{flex:1;min-width:0}
+.report-task-title{font-size:13px;font-weight:500}
+.report-task-note{font-size:12px;color:var(--ink2);font-style:italic;margin-top:2px}
+.report-task-meta{font-size:11px;color:var(--ink3);font-family:'DM Mono',monospace;margin-top:2px}
+
+.action-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.25rem}
+.outline-btn{padding:7px 14px;border:1px solid var(--border2);border-radius:var(--rsm);background:transparent;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--ink2);cursor:pointer;transition:all .15s}
+.outline-btn:hover{background:var(--surface3);color:var(--ink)}
+.outline-btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.outline-btn.primary:hover{opacity:.85}
+
+.week-tabs{display:flex;gap:6px;margin-bottom:1.25rem;overflow-x:auto;padding-bottom:4px}
+.wt{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;font-size:12px;font-family:'DM Mono',monospace;cursor:pointer;color:var(--ink2);white-space:nowrap;transition:all .15s}
+.wt.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+.lead-badge{display:inline-block;background:var(--amber-bg);color:var(--amber);font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;letter-spacing:.4px;text-transform:uppercase;margin-left:6px;vertical-align:middle}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--ink3);font-size:13px}
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--ink);color:#fff;padding:10px 16px;border-radius:var(--r);font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:100}
+.toast.show{opacity:1}
+
+@media(max-width:600px){
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .dev-grid{grid-template-columns:1fr}
+  .topbar{padding:0 1rem}
+  .content{padding:1rem}
+}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <h1>Daily Standup</h1>
+    <p>Who are you? Pick your name to continue.</p>
+    <div class="dev-grid" id="dev-grid"></div>
+    <div class="divider">or</div>
+    <button class="lead-btn" onclick="selectRole('lead')">Sign in as Team Lead</button>
+    <button class="btn-enter" id="enter-btn" disabled onclick="enterApp()">Enter →</button>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <span class="topbar-title">Standup planner</span>
+    <span class="topbar-date" id="top-date"></span>
+    <div class="sync-dot" id="sync-dot"></div>
+    <span class="sync-lbl" id="sync-lbl">connecting…</span>
+    <div class="user-pill" onclick="logout()">
+      <div class="av-sm" id="top-av"></div>
+      <span id="top-name"></span>
+      <span style="color:var(--ink3);font-size:11px">↩</span>
+    </div>
+  </div>
+  <div class="tab-bar" id="tab-bar"></div>
+  <div class="content">
+    <div class="view" id="v-morning">
+      <div class="add-bar" id="add-bar" style="display:none">
+        <input id="ti" type="text" placeholder="Add a task…" onkeydown="if(event.key==='Enter')addTask()"/>
+        <select id="ds"></select>
+        <select id="ps"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select>
+        <select id="dl"><option value="EOD">EOD</option><option value="TBD">TBD</option><option value="First half">First half</option><option value="Monday">Monday</option></select>
+        <button class="btn-add" onclick="addTask()">+ Add task</button>
+      </div>
+      <div class="section-label" id="morning-lbl">Task assignments</div>
+      <div id="task-list"></div>
+    </div>
+    <div class="view" id="v-progress">
+      <div style="margin-bottom:1rem">
+        <select id="fd" onchange="renderProgress()" style="border:1px solid var(--border);border-radius:var(--rsm);padding:6px 10px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--ink);cursor:pointer;outline:none"></select>
+      </div>
+      <div id="progress-list"></div>
+    </div>
+    <div class="view" id="v-report">
+      <div class="action-row">
+        <button class="outline-btn primary" onclick="copyReport()">Copy report text</button>
+        <button class="outline-btn" onclick="renderReport()">Refresh</button>
+      </div>
+      <div class="stats-row" id="rpt-stats"></div>
+      <div id="rpt-body"></div>
+    </div>
+    <div class="view" id="v-history">
+      <div class="section-label">Past 7 days</div>
+      <div class="week-tabs" id="week-tabs"></div>
+      <div id="history-body"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══ CONFIG ══
+const SUPABASE_URL='https://ecxiuzrbnmwcbzxczdct.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjeGl1enJibm13Y2J6eGN6ZGN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3OTgyMTcsImV4cCI6MjA5MTM3NDIxN30.yShn8U3yxYZNecZDR-ZlZN3bFtrFcSd31259Z5tMzOM';
+const HEADERS={'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY};
+
+// ══ DEVS ══
+const DEVS=[
+  {id:'aniket',   name:'Aniket',   i:'AN', bg:'#dbeafe', tc:'#1e40af'},
+  {id:'kamal',    name:'Kamal',    i:'KA', bg:'#d1fae5', tc:'#065f46'},
+  {id:'atharva',  name:'Atharva',  i:'AT', bg:'#fce7f3', tc:'#9d174d'},
+  {id:'lavanya',  name:'Lavanya',  i:'LA', bg:'#fef3c7', tc:'#92400e'},
+  {id:'abhishek', name:'Abhishek', i:'AB', bg:'#ede9fe', tc:'#4c1d95'},
+];
+
+const DEFAULT_TASKS=[
+  {id:1, title:'Verify FX hedging error',                              dev:'aniket',   mod:'RE FX',        pri:'high',   dl:'EOD',        st:'todo', note:''},
+  {id:2, title:'Logic apps tagging & Spark pool migration',            dev:'aniket',   mod:'RE FX',        pri:'medium', dl:'TBD',        st:'todo', note:''},
+  {id:3, title:'Asset testing End to End',                             dev:'kamal',    mod:'Notebooks',    pri:'high',   dl:'EOD',        st:'todo', note:''},
+  {id:4, title:'Schedule Notebook excl. emails to clients',            dev:'kamal',    mod:'Notebooks',    pri:'medium', dl:'EOD',        st:'todo', note:''},
+  {id:5, title:'Blank file vs File with no trades — test reports',     dev:'atharva',  mod:'Trade blotter',pri:'medium', dl:'EOD',        st:'todo', note:''},
+  {id:6, title:'Friday files: send on Monday instead of Saturday',     dev:'atharva',  mod:'Trade blotter',pri:'low',    dl:'EOD',        st:'todo', note:''},
+  {id:7, title:'If files on Sat/Sun, send those files on Monday',      dev:'atharva',  mod:'Trade blotter',pri:'low',    dl:'EOD',        st:'todo', note:''},
+  {id:8, title:'Report Feedback',                                      dev:'lavanya',  mod:'Trade report', pri:'medium', dl:'EOD',        st:'todo', note:''},
+  {id:9, title:'Deploy & verify the report in UAT',                    dev:'lavanya',  mod:'Trade report', pri:'high',   dl:'EOD',        st:'todo', note:''},
+  {id:10,title:'Spark pool migration',                                 dev:'lavanya',  mod:'Trade report', pri:'medium', dl:'TBD',        st:'todo', note:''},
+  {id:11,title:'Invalid records',                                      dev:'abhishek', mod:'Allvue',       pri:'high',   dl:'First half', st:'todo', note:''},
+  {id:12,title:'Ingest Q4 data + documentation',                       dev:'abhishek', mod:'SMA IRR',      pri:'medium', dl:'EOD',        st:'todo', note:''},
+  {id:13,title:'Finding reorgs',                                       dev:'abhishek', mod:'SMA IRR',      pri:'medium', dl:'EOD',        st:'todo', note:''},
+  {id:14,title:'Identify additional reorgs based on additional cases', dev:'abhishek', mod:'SMA IRR',      pri:'medium', dl:'TBD',        st:'todo', note:''},
+  {id:15,title:'Exclude reorgs',                                       dev:'abhishek', mod:'SMA IRR',      pri:'low',    dl:'EOD',        st:'todo', note:''},
+  {id:16,title:'Recon (Allvue vs DWH) once per day + mail alert',      dev:'abhishek', mod:'Allvue',       pri:'low',    dl:'EOD',        st:'todo', note:'De-prioritised due to SMA IRR'},
+];
+
+// ══ STATE ══
+let currentRole=null;
+let tasks=[];
+let nid=20;
+let pollTimer=null;
+
+const todayKey=()=>new Date().toISOString().slice(0,10);
+const devById=id=>DEVS.find(d=>d.id===id)||{name:id,i:'??',bg:'#eee',tc:'#333'};
+const slbl=s=>({todo:'To do',inprogress:'In progress',done:'Done',blocked:'Blocked'}[s]||s);
+const scls=s=>({todo:'t-tbd',inprogress:'t-prog',done:'t-done',blocked:'t-block'}[s]||'');
+const pcls=p=>({high:'t-high',medium:'t-medium',low:'t-low'}[p]||'');
+const dlcls=d=>d==='EOD'?'t-eod':d==='TBD'?'t-tbd':'t-other';
+const fmtDate=d=>new Date(d+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+
+// ══ SUPABASE API ══
+function setSyncStatus(status){
+  const dot=document.getElementById('sync-dot');
+  const lbl=document.getElementById('sync-lbl');
+  dot.className='sync-dot '+status;
+  lbl.textContent=status==='ok'?'synced':status==='loading'?'syncing…':'offline';
+}
+
+async function dbLoad(date){
+  setSyncStatus('loading');
+  try{
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/tasks?date=eq.${date}&select=data`,{headers:HEADERS});
+    const rows=await r.json();
+    setSyncStatus('ok');
+    if(rows&&rows.length>0) return rows[0].data;
+    return null;
+  }catch(e){setSyncStatus('err');return null;}
+}
+
+async function dbSave(date,data){
+  setSyncStatus('loading');
+  try{
+    // upsert
+    const r=await fetch(`${SUPABASE_URL}/rest/v1/tasks`,{
+      method:'POST',
+      headers:{...HEADERS,'Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify({id:dateToId(date),date,data,updated_at:new Date().toISOString()})
+    });
+    setSyncStatus('ok');
+    showToast('Saved & synced ✓');
+  }catch(e){setSyncStatus('err');showToast('Sync failed — check connection');}
+}
+
+function dateToId(date){
+  // convert date string to integer id e.g. 2024-04-10 -> 20240410
+  return parseInt(date.replace(/-/g,''));
+}
+
+async function loadToday(){
+  const remote=await dbLoad(todayKey());
+  if(remote){
+    tasks=remote;
+  } else {
+    tasks=JSON.parse(JSON.stringify(DEFAULT_TASKS));
+    await dbSave(todayKey(),tasks);
+  }
+  renderAll();
+}
+
+async function saveAndSync(){
+  await dbSave(todayKey(),tasks);
+}
+
+// Poll every 15 seconds to pick up other people's changes
+function startPolling(){
+  if(pollTimer)clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    const remote=await dbLoad(todayKey());
+    if(remote){
+      tasks=remote;
+      renderAll();
+    }
+  },15000);
+}
+
+// ══ TOAST ══
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ══ LOGIN ══
+let selectedRole=null;
+function buildLoginGrid(){
+  document.getElementById('dev-grid').innerHTML=DEVS.map(d=>`
+    <div class="dev-pick" onclick="selectRole('${d.id}')" id="pick-${d.id}">
+      <div class="av" style="background:${d.bg};color:${d.tc}">${d.i}</div>
+      <span class="dname">${d.name}</span>
+    </div>`).join('');
+}
+function selectRole(role){
+  selectedRole=role;
+  document.querySelectorAll('.dev-pick').forEach(el=>el.classList.remove('selected'));
+  if(role!=='lead'){const el=document.getElementById('pick-'+role);if(el)el.classList.add('selected');}
+  document.getElementById('enter-btn').disabled=false;
+  document.getElementById('enter-btn').textContent=role==='lead'?'Enter as Lead →':'Enter →';
+}
+async function enterApp(){
+  if(!selectedRole)return;
+  currentRole=selectedRole;
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  setupApp();
+  await loadToday();
+  startPolling();
+}
+function logout(){
+  if(pollTimer)clearInterval(pollTimer);
+  selectedRole=null;currentRole=null;
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('enter-btn').disabled=true;
+  document.querySelectorAll('.dev-pick').forEach(el=>el.classList.remove('selected'));
+}
+
+// ══ APP SETUP ══
+function setupApp(){
+  document.getElementById('top-date').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const isLead=currentRole==='lead';
+  const dev=!isLead?devById(currentRole):null;
+  const av=document.getElementById('top-av');
+  const nm=document.getElementById('top-name');
+  if(isLead){av.style.background='#fef3c7';av.style.color='#92400e';av.textContent='LD';nm.textContent='Lead';}
+  else{av.style.background=dev.bg;av.style.color=dev.tc;av.textContent=dev.i;nm.textContent=dev.name;}
+
+  const tabs=isLead
+    ?[{id:'morning',label:'Morning tasks'},{id:'progress',label:'Progress'},{id:'report',label:'Report'},{id:'history',label:'History'}]
+    :[{id:'progress',label:'My tasks'},{id:'morning',label:'All tasks'}];
+  document.getElementById('tab-bar').innerHTML=tabs.map((t,i)=>
+    `<button class="tb${i===0?' on':''}" onclick="showView('${t.id}',this)">${t.label}${(t.id==='report'||t.id==='history')&&isLead?'<span class="lead-badge">Lead</span>':''}</button>`
+  ).join('');
+
+  document.getElementById('ds').innerHTML=DEVS.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  const fd=document.getElementById('fd');
+  if(isLead) fd.innerHTML='<option value="all">All developers</option>'+DEVS.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  else fd.innerHTML=`<option value="${currentRole}">${dev.name} (you)</option>`;
+
+  document.getElementById('add-bar').style.display=isLead?'flex':'none';
+  showView(isLead?'morning':'progress',document.querySelector('.tb'));
+}
+
+function showView(v,btn){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('on'));
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('v-'+v).classList.add('on');
+  if(btn)btn.classList.add('on');
+  if(v==='morning')renderMorning();
+  if(v==='progress')renderProgress();
+  if(v==='report')renderReport();
+  if(v==='history')renderHistory();
+}
+
+function renderAll(){
+  const active=document.querySelector('.view.on');
+  if(!active)return;
+  const id=active.id.replace('v-','');
+  if(id==='morning')renderMorning();
+  if(id==='progress')renderProgress();
+  if(id==='report')renderReport();
+}
+
+// ══ MORNING ══
+async function addTask(){
+  const t=document.getElementById('ti').value.trim();if(!t)return;
+  tasks.push({id:nid++,title:t,dev:document.getElementById('ds').value,mod:'',pri:document.getElementById('ps').value,dl:document.getElementById('dl').value,st:'todo',note:''});
+  document.getElementById('ti').value='';
+  renderMorning();
+  await saveAndSync();
+}
+async function removeTask(id){
+  tasks=tasks.filter(t=>t.id!==id);
+  renderMorning();
+  await saveAndSync();
+}
+function renderMorning(){
+  const isLead=currentRole==='lead';
+  const list=document.getElementById('task-list');
+  document.getElementById('morning-lbl').textContent=`Task assignments · ${tasks.length} total`;
+  if(!tasks.length){list.innerHTML='<div class="empty-state">No tasks assigned yet.</div>';return;}
+  let h='';
+  DEVS.forEach(dev=>{
+    const dt=tasks.filter(t=>t.dev===dev.id);if(!dt.length)return;
+    const done=dt.filter(t=>t.st==='done').length;
+    const pct=Math.round(done/dt.length*100);
+    h+=`<div class="dev-section"><div class="dev-hdr">
+      <div class="av" style="background:${dev.bg};color:${dev.tc}">${dev.i}</div>
+      <div><div class="dev-name-lbl">${dev.name}</div><div class="prog-bar-wrap" style="width:80px"><div class="prog-bar-fill" style="width:${pct}%"></div></div></div>
+      <span class="dev-meta">${done}/${dt.length} done</span></div>`;
+    dt.forEach(t=>{
+      h+=`<div class="task-card${t.st==='done'?' done-card':''}"><div class="task-left">
+        <div class="task-title">${t.title}</div>
+        ${t.mod?`<div class="task-mod">${t.mod}</div>`:''}
+        <div class="task-tags"><span class="tag ${pcls(t.pri)}">${t.pri}</span><span class="tag ${dlcls(t.dl)}">${t.dl}</span><span class="tag ${scls(t.st)}">${slbl(t.st)}</span></div>
+      </div>${isLead?`<button class="remove-btn" onclick="removeTask(${t.id})">×</button>`:''}</div>`;
+    });
+    h+='</div>';
+  });
+  list.innerHTML=h;
+}
+
+// ══ PROGRESS ══
+async function setSt(id,s){
+  const t=tasks.find(t=>t.id===id);if(t){t.st=s;renderProgress();renderMorning();await saveAndSync();}
+}
+let noteTimer=null;
+function setNote(id,v){
+  const t=tasks.find(t=>t.id===id);if(t)t.note=v;
+  clearTimeout(noteTimer);
+  noteTimer=setTimeout(()=>saveAndSync(),1000);
+}
+function renderProgress(){
+  const isLead=currentRole==='lead';
+  const fd=document.getElementById('fd').value;
+  const c=document.getElementById('progress-list');
+  const ft=fd==='all'?tasks:tasks.filter(t=>t.dev===fd);
+  if(!ft.length){c.innerHTML='<div class="empty-state">No tasks.</div>';return;}
+  const byDev={};ft.forEach(t=>{if(!byDev[t.dev])byDev[t.dev]=[];byDev[t.dev].push(t);});
+  let h='';
+  Object.keys(byDev).forEach(did=>{
+    const dev=devById(did);
+    const isMine=!isLead&&did===currentRole;
+    if(!isLead&&!isMine)return;
+    h+=`<div class="dev-section"><div class="dev-hdr">
+      <div class="av" style="background:${dev.bg};color:${dev.tc}">${dev.i}</div>
+      <span class="dev-name-lbl">${dev.name}${isMine?' <span style="font-size:11px;color:var(--ink3);font-weight:400">(you)</span>':''}</span></div>`;
+    byDev[did].forEach(t=>{
+      h+=`<div class="prog-card"><div class="prog-top">
+        <div style="flex:1;min-width:140px"><div class="prog-title">${t.title}</div>${t.mod?`<div class="prog-sub">${t.mod} · ${t.dl}</div>`:''}</div>
+        <div class="status-row">${['todo','inprogress','done','blocked'].map(s=>`<button class="sp ${scls(s)}" style="border-color:${t.st===s?'currentColor':'transparent'}" onclick="setSt(${t.id},'${s}')">${slbl(s)}</button>`).join('')}</div>
+      </div>
+      <textarea class="prog-comment" placeholder="Add a comment or blocker note…" onchange="setNote(${t.id},this.value)">${t.note}</textarea></div>`;
+    });
+    h+='</div>';
+  });
+  c.innerHTML=h||'<div class="empty-state">No tasks found.</div>';
+}
+
+// ══ REPORT ══
+function renderReport(){
+  const cnt={todo:0,inprogress:0,done:0,blocked:0};tasks.forEach(t=>cnt[t.st]++);
+  document.getElementById('rpt-stats').innerHTML=[
+    {l:'Total',v:tasks.length,c:''},{l:'Done',v:cnt.done,c:'#2d7a4f'},
+    {l:'In progress',v:cnt.inprogress,c:'#1a5fa8'},{l:'Blocked',v:cnt.blocked,c:'#a02020'},
+  ].map(s=>`<div class="stat"><div class="stat-n" style="${s.c?'color:'+s.c:''}">${s.v}</div><div class="stat-l">${s.l}</div></div>`).join('');
+  let h='';
+  DEVS.forEach(dev=>{
+    const dt=tasks.filter(t=>t.dev===dev.id);if(!dt.length)return;
+    const done=dt.filter(t=>t.st==='done').length;
+    const pct=Math.round(done/dt.length*100);
+    h+=`<div class="report-dev"><div class="report-dev-hdr">
+      <div class="av" style="background:${dev.bg};color:${dev.tc}">${dev.i}</div>
+      <span style="font-size:14px;font-weight:600">${dev.name}</span>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:12px;color:var(--ink3);font-family:'DM Mono',monospace">${done}/${dt.length} · ${pct}%</div>
+        <div class="prog-bar-wrap" style="width:80px;margin-top:4px"><div class="prog-bar-fill" style="width:${pct}%"></div></div>
+      </div></div>`;
+    dt.forEach(t=>{
+      h+=`<div class="report-task"><div class="report-task-info">
+        <div class="report-task-title">${t.title}</div>
+        ${t.mod?`<div class="report-task-meta">${t.mod} · ${t.dl}</div>`:''}
+        ${t.note?`<div class="report-task-note">${t.note}</div>`:''}
+      </div><span class="tag ${scls(t.st)}" style="flex-shrink:0">${slbl(t.st)}</span></div>`;
+    });
+    h+='</div>';
+  });
+  document.getElementById('rpt-body').innerHTML=h||'<div class="empty-state">No tasks yet.</div>';
+}
+function copyReport(){
+  const now=new Date();
+  let txt=`STANDUP REPORT — ${now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}\n${'─'.repeat(50)}\n\n`;
+  const cnt={todo:0,inprogress:0,done:0,blocked:0};tasks.forEach(t=>cnt[t.st]++);
+  txt+=`Summary: ${tasks.length} tasks · ${cnt.done} done · ${cnt.inprogress} in progress · ${cnt.blocked} blocked\n\n`;
+  DEVS.forEach(dev=>{
+    const dt=tasks.filter(t=>t.dev===dev.id);if(!dt.length)return;
+    txt+=`${dev.name}\n`;
+    dt.forEach(t=>{txt+=`  • [${slbl(t.st).toUpperCase()}] ${t.title} (${t.dl})${t.note?'\n    → '+t.note:''}\n`;});
+    txt+='\n';
+  });
+  navigator.clipboard.writeText(txt).then(()=>showToast('Report copied to clipboard!'));
+}
+
+// ══ HISTORY ══
+async function renderHistory(){
+  const body=document.getElementById('history-body');
+  const tabs=document.getElementById('week-tabs');
+  const keys=[];
+  for(let i=1;i<=7;i++){
+    const d=new Date();d.setDate(d.getDate()-i);
+    keys.push(d.toISOString().slice(0,10));
+  }
+  // Check which days have data
+  const available=[];
+  for(const k of keys){
+    const data=await dbLoad(k);
+    if(data)available.push({key:k,data});
+  }
+  if(!available.length){
+    tabs.innerHTML='';
+    body.innerHTML='<div class="empty-state">No history yet. Past days will appear here automatically as the team uses the planner.</div>';
+    return;
+  }
+  tabs.innerHTML=available.map((d,i)=>`<button class="wt${i===0?' on':''}" onclick="showHistDay(${i},this)">${fmtDate(d.key)}</button>`).join('');
+  window._histData=available;
+  showHistDay(0,tabs.children[0]);
+}
+function showHistDay(idx,btn){
+  document.querySelectorAll('.wt').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  const {data:dayTasks}=window._histData[idx];
+  const body=document.getElementById('history-body');
+  const cnt={todo:0,inprogress:0,done:0,blocked:0};dayTasks.forEach(t=>cnt[t.st]++);
+  let h=`<div class="stats-row">${[{l:'Total',v:dayTasks.length,c:''},{l:'Done',v:cnt.done,c:'#2d7a4f'},{l:'In progress',v:cnt.inprogress,c:'#1a5fa8'},{l:'Blocked',v:cnt.blocked,c:'#a02020'}].map(s=>`<div class="stat"><div class="stat-n" style="${s.c?'color:'+s.c:''}">${s.v}</div><div class="stat-l">${s.l}</div></div>`).join('')}</div>`;
+  DEVS.forEach(dev=>{
+    const dt=dayTasks.filter(t=>t.dev===dev.id);if(!dt.length)return;
+    const done=dt.filter(t=>t.st==='done').length;
+    h+=`<div class="report-dev"><div class="report-dev-hdr">
+      <div class="av" style="background:${dev.bg};color:${dev.tc}">${dev.i}</div>
+      <span style="font-size:14px;font-weight:600">${dev.name}</span>
+      <span style="font-size:12px;color:var(--ink3);font-family:'DM Mono',monospace;margin-left:auto">${done}/${dt.length} done</span></div>`;
+    dt.forEach(t=>{
+      h+=`<div class="report-task"><div class="report-task-info">
+        <div class="report-task-title">${t.title}</div>
+        ${t.mod?`<div class="report-task-meta">${t.mod}</div>`:''}
+        ${t.note?`<div class="report-task-note">${t.note}</div>`:''}
+      </div><span class="tag ${scls(t.st)}">${slbl(t.st)}</span></div>`;
+    });
+    h+='</div>';
+  });
+  body.innerHTML=h;
+}
+
+// ══ INIT ══
+buildLoginGrid();
+</script>
+</body>
+</html>
