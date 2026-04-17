@@ -330,6 +330,24 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--ink
 .timer-secondary-btn{width:100%;padding:8px;border:1px solid var(--border2);border-radius:var(--r);background:transparent;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink2);cursor:pointer;transition:all .15s}
 .timer-secondary-btn:hover{background:var(--surface3);color:var(--ink)}
 .timer-progress-ring{margin:0 auto 4px;display:block}
+
+/* ══ CLOSED TASKS VIEW ══ */
+.closed-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.closed-header-title{font-size:15px;font-weight:600;flex:1}
+.closed-day-tabs{display:flex;gap:6px;margin-bottom:1.25rem;overflow-x:auto;padding-bottom:4px}
+.closed-day-tab{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;font-size:12px;font-family:'DM Mono',monospace;cursor:pointer;color:var(--ink2);white-space:nowrap;transition:all .15s}
+.closed-day-tab.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.closed-task-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:11px 14px;margin-bottom:7px;display:flex;align-items:flex-start;gap:10px;opacity:.8}
+.closed-task-row.st-done{border-left:3px solid var(--green)}
+.closed-task-row.st-blocked{border-left:3px solid var(--red);opacity:1}
+.closed-task-row.st-inprogress{border-left:3px solid var(--blue);opacity:1}
+.closed-task-title{font-size:13px;font-weight:500;flex:1;line-height:1.4}
+.closed-task-meta{font-size:11px;color:var(--ink3);font-family:'DM Mono',monospace;margin-top:2px}
+.closed-day-summary{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
+.closed-sum-pill{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500}
+.closed-empty{text-align:center;padding:2.5rem 1rem;color:var(--ink3);font-size:13px}
+.closed-dev-group{margin-bottom:1.25rem}
+.closed-dev-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -417,6 +435,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--ink
       <div id="weekly-loading" style="display:none;font-size:12px;color:var(--ink3);margin-bottom:1rem">⏳ Loading week's data…</div>
       <div class="stats-row" id="rpt-stats"></div>
       <div id="rpt-body"></div>
+    </div>
+
+    <!-- CLOSED TASKS -->
+    <div class="view" id="v-closed">
+      <div id="closed-content"></div>
     </div>
 
     <!-- HISTORY -->
@@ -730,6 +753,7 @@ function setupApp(){
         {id:'sprint',label:'Sprint'},
         {id:'attendance',label:'Attendance'},
         {id:'report',label:'Report'},
+        {id:'closed',label:'Closed tasks'},
         {id:'history',label:'History'},
         {id:'team',label:'Team'}
       ]
@@ -738,10 +762,11 @@ function setupApp(){
         {id:'morning',label:'All tasks'},
         {id:'kanban',label:'Board'},
         {id:'sprint',label:'Sprint'},
-        {id:'attendance',label:'Attendance'}
+        {id:'attendance',label:'Attendance'},
+        {id:'closed',label:'Closed tasks'}
       ];
   document.getElementById('tab-bar').innerHTML=tabs.map((t,i)=>
-    `<button class="tb${i===0?' on':''}" onclick="showView('${t.id}',this)">${t.label}${['report','history','team'].includes(t.id)?'<span class="lead-badge">Lead</span>':''}</button>`
+    `<button class="tb${i===0?' on':''}" onclick="showView('${t.id}',this)">${t.label}${['report','history','team','closed'].includes(t.id)?'<span class="lead-badge">Lead</span>':''}</button>`
   ).join('');
   refreshSelects();
   document.getElementById('add-bar').style.display=isLead?'flex':'none';
@@ -770,6 +795,7 @@ function showView(v,btn){
   if(v==='sprint'){currentSprintOffset=0;renderSprint();}
   if(v==='attendance'){currentAttWeekOffset=0;renderAttendance();}
   if(v==='kanban'){renderKanban();}
+  if(v==='closed'){renderClosed();}
 }
 function renderAll(){
   const active=document.querySelector('.view.on');
@@ -1192,6 +1218,119 @@ async function copyWeeklySummary(){
   }
   navigator.clipboard.writeText(txt).then(()=>showToast('Weekly summary copied! ✓'));
 }
+
+// ══ CLOSED TASKS ══
+async function renderClosed(){
+  const el=document.getElementById('closed-content');
+  el.innerHTML='<div class="closed-empty">Loading…</div>';
+
+  // load past 14 days (2 weeks of sprint data)
+  const keys=[];
+  for(let i=1;i<=14;i++){
+    const d=new Date();d.setDate(d.getDate()-i);
+    keys.push(d.toISOString().slice(0,10));
+  }
+
+  // load all days in parallel
+  const results=await Promise.all(keys.map(async k=>({key:k,data:await dbLoad(k)})));
+  const available=results.filter(r=>r.data&&r.data.length>0);
+
+  if(!available.length){
+    el.innerHTML='<div class="closed-empty">No closed tasks yet. Past days will appear here once tasks are completed.</div>';
+    return;
+  }
+
+  const isLead=currentRole==='lead';
+
+  // Build day tabs
+  let h=`<div class="closed-header">
+    <span class="closed-header-title">Closed Tasks</span>
+    <span style="font-size:12px;color:var(--ink3)">${available.length} day${available.length!==1?'s':''} with data</span>
+  </div>`;
+
+  h+=`<div class="closed-day-tabs">
+    ${available.map((d,i)=>`<button class="closed-day-tab${i===0?' on':''}" onclick="showClosedDay(${i},this)">${fmtDate(d.key)}</button>`).join('')}
+  </div>`;
+
+  h+=`<div id="closed-day-body"></div>`;
+  el.innerHTML=h;
+
+  // store for tab switching
+  window._closedData=available;
+  showClosedDay(0, document.querySelector('.closed-day-tab'));
+}
+
+function showClosedDay(idx, btn){
+  document.querySelectorAll('.closed-day-tab').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+
+  const {key, data}=window._closedData[idx];
+  const isLead=currentRole==='lead';
+  const priOrder={high:0,medium:1,low:2};
+
+  // Only show tasks that are NOT todo — i.e. done, blocked, inprogress from that day
+  // For non-leads, only show their own tasks
+  const relevantTasks=data.filter(t=>{
+    const stOk=t.st!=='todo';
+    const devOk=isLead||(t.dev===currentRole);
+    return stOk&&devOk;
+  });
+
+  // Summary counts
+  const cnt={done:0,inprogress:0,blocked:0,inreview:0};
+  relevantTasks.forEach(t=>{ if(cnt[t.st]!==undefined) cnt[t.st]++; });
+  const total=relevantTasks.length;
+
+  let h=`<div class="closed-day-summary">
+    <span class="closed-sum-pill" style="background:var(--surface3);color:var(--ink2)">${total} total</span>
+    ${cnt.done?`<span class="closed-sum-pill t-done">${cnt.done} done</span>`:''}
+    ${cnt.inprogress?`<span class="closed-sum-pill t-prog">${cnt.inprogress} in progress</span>`:''}
+    ${cnt.blocked?`<span class="closed-sum-pill t-block">${cnt.blocked} blocked</span>`:''}
+  </div>`;
+
+  if(!total){
+    h+=`<div class="closed-empty">No closed tasks for this day.</div>`;
+    document.getElementById('closed-day-body').innerHTML=h;
+    return;
+  }
+
+  // Group by developer
+  DEVS.forEach(dev=>{
+    const devTasks=relevantTasks
+      .filter(t=>t.dev===dev.id)
+      .sort((a,b)=>{
+        // done last, blocked first
+        const order={blocked:0,inprogress:1,inreview:2,done:3};
+        return (order[a.st]||1)-(order[b.st]||1) || (priOrder[a.pri]||1)-(priOrder[b.pri]||1);
+      });
+    if(!devTasks.length) return;
+
+    h+=`<div class="closed-dev-group">
+      <div class="closed-dev-hdr">
+        <div class="av" style="background:${dev.bg};color:${dev.tc};width:26px;height:26px;font-size:10px">${dev.i}</div>
+        <span style="font-size:13px;font-weight:600">${dev.name}</span>
+        <span style="font-size:11px;color:var(--ink3);font-family:'DM Mono',monospace;margin-left:auto">${devTasks.filter(t=>t.st==='done').length}/${devTasks.length} done</span>
+      </div>`;
+
+    devTasks.forEach(t=>{
+      h+=`<div class="closed-task-row st-${t.st}">
+        <div style="flex:1;min-width:0">
+          <div class="closed-task-title">${t.title}</div>
+          <div class="closed-task-meta">${t.mod||''}${t.mod&&t.dl?' · ':''}${t.dl||''}</div>
+          ${(t.comments&&t.comments.length)?`<div style="font-size:11px;color:var(--ink3);margin-top:4px">💬 ${t.comments.length} comment${t.comments.length>1?'s':''}</div>`:''}
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
+          <span class="tag ${scls(t.st)}">${slbl(t.st)}</span>
+          <span class="tag ${pcls(t.pri)}" style="font-size:10px">${t.pri==='high'?'🔴':t.pri==='medium'?'🟡':'🟢'} ${t.pri}</span>
+        </div>
+      </div>`;
+    });
+    h+=`</div>`;
+  });
+
+  document.getElementById('closed-day-body').innerHTML=h;
+}
+
 // ══ HISTORY ══
 async function renderHistory(){
   document.getElementById('history-body').innerHTML='<div class="empty-state">Loading…</div>';
